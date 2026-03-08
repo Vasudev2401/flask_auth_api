@@ -9,7 +9,6 @@ from flask_jwt_extended import (
     get_jwt
 )
 from models.user import User
-from models.token_blocklist import TokenBlocklist
 from extensions.db import db
 from utils.password import hash_password, verify_password
 from extensions.redis import redis_client
@@ -95,7 +94,6 @@ def refresh():
 @jwt_required()
 def logout():
     jti = get_jwt()["jti"]
-    blocked = TokenBlocklist(jti=jti)
-    db.session.add(blocked)
-    db.session.commit()
+    key = f"blocklist:{jti}"
+    redis_client.set(key,"revoked",ex=3600)
     return make_response({"message":"Token blocked"})
