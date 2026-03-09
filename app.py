@@ -3,7 +3,9 @@ from extensions.jwt import jwt
 from extensions.db import db
 from flask import Flask
 from flask_migrate import Migrate
+from routes import admin_routes
 from routes.auth_routes import auth_bp
+from routes.admin_routes import admin_bp
 from extensions.redis import redis_client
 
 app = Flask(__name__)
@@ -25,4 +27,5 @@ def check_if_token_blocked(jwt_header,jwt_payload):
     return token is not None
 
 app.register_blueprint(auth_bp,url_prefix="/auth")
+app.register_blueprint(admin_bp,url_prefix="/admin")
 

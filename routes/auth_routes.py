@@ -1,6 +1,4 @@
-from urllib import response
-
-from flask import Blueprint ,request ,jsonify,make_response
+from flask import Blueprint ,request ,make_response
 from flask_jwt_extended import (
     create_access_token,
     create_refresh_token,
@@ -71,7 +69,9 @@ def login():
         redis_client.expire(key,BLOCK_TIME)
         return make_response({"message":"Password not correct"},401)
     
-    access_token = create_access_token(identity=str(user.id))
+    access_token = create_access_token(identity=str(user.id),additional_claims={
+        "role":user.role
+    })
     refresh_token = create_refresh_token(identity=str(user.id))
     return make_response({"access_token":access_token,"refresh_token":refresh_token,"message":"User logged in"},200)
 
@@ -87,7 +87,10 @@ def profile():
 @jwt_required(refresh=True)
 def refresh():
     user_id = int(get_jwt_identity())
-    new_access_token = create_access_token(identity = str(user_id))
+    user = User.query.get(user_id)
+    new_access_token = create_access_token(identity = str(user_id),additional_claims={
+        "role":user.role
+    })
     return make_response({"new_access_token":new_access_token},200)
 
 @auth_bp.route("/logout",methods=["POST"])
