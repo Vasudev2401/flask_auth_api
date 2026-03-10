@@ -1,5 +1,5 @@
 from flask import Blueprint,make_response,request
-from flask_jwt_extended import jwt_required
+from flask_jwt_extended import jwt_required,get_jwt_identity
 from constants import ALLOWED_ROLES
 from utils.role_required import role_required
 from models.user import User
@@ -30,6 +30,7 @@ def get_users():
 def set_role(username):
     data = request.json
     role = data["role"]
+    current_user_id = get_jwt_identity()
 
     if not role:
         return make_response({"message":"Role not present"},400)
@@ -42,6 +43,9 @@ def set_role(username):
     if not user:
         return make_response({"message":"User not found"},404)
     
+    if user.role == current_user_id:
+        return make_response({"message":"You cant change your own role"},400)
+    
     if role==user.role:
         return make_response({"message":"No change in role"},400)
     
@@ -51,7 +55,23 @@ def set_role(username):
     user.role = role
     db.session.commit()
     return make_response({"message":f"User {username} role changed to {role}"})
+
+@jwt_required()
+@role_required(["admin"])
+@admin_bp.route("/get_user/<username>")
+def get_user(username):
+    user = User.query.filter_by(username = username).first()
+
+    if not user:
+       return make_response({"message":"No such user exists"},404)
     
+    res = {
+        "username":user.username,
+        "email":user.email,
+        "role":user.role
+    }
+
+    return make_response({"user_data":res})
 
 
 
