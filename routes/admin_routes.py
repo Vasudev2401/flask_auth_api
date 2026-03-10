@@ -1,0 +1,58 @@
+from flask import Blueprint,make_response,request
+from flask_jwt_extended import jwt_required
+from constants import ALLOWED_ROLES
+from utils.role_required import role_required
+from models.user import User
+from extensions.db import db
+
+admin_bp = Blueprint("admin",__name__)
+
+@jwt_required()
+@role_required(["admin"])
+@admin_bp.route("/users")
+def get_users():
+    page = request.args.get("page",1,int)
+
+    pagination = User.query.paginate(page=page,per_page=10,error_out=False)
+
+    users = [{
+        "username":user.username,
+        "id":user.id,
+        "email":user.email,
+        "role":user.role
+    } for user in pagination.items]
+
+    return make_response({"users":users,"total":pagination.total,"current_page":pagination.page},200)
+
+@jwt_required()
+@role_required(["admin"])
+@admin_bp.route("/set_role/<username>",methods=['PATCH'])
+def set_role(username):
+    data = request.json
+    role = data["role"]
+
+    if not role:
+        return make_response({"message":"Role not present"},400)
+    
+    if role not in ALLOWED_ROLES:
+        return make_response({"message":"Wrong role Assigned"},400)
+    
+    user = User.query.filter_by(username=username).first()
+
+    if not user:
+        return make_response({"message":"User not found"},404)
+    
+    if role==user.role:
+        return make_response({"message":"No change in role"},400)
+    
+    if user.role=="admin":
+        return make_response({"message":"Cant change role of an admin"},400)
+    
+    user.role = role
+    db.session.commit()
+    return make_response({"message":f"User {username} role changed to {role}"})
+    
+
+
+
+
