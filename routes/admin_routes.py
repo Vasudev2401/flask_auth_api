@@ -73,6 +73,33 @@ def get_user(username):
 
     return make_response({"user_data":res})
 
+@jwt_required()
+@role_required(["admin"])
+@admin_bp.route("/get_user/<username>")
+def get_specific_user(username):
+    user = User.query.filter_by(username = username).first()
 
+    if not user:
+       return make_response({"message":"No such user exists"},404)
+    
+    res = {
+        "username":user.username,
+        "email":user.email,
+        "role":user.role
+    }
 
+    return make_response({"user_data":res})
 
+@jwt_required()
+@role_required(["admin"])
+@admin_bp.route("/delete_user/<username>",methods=['DELETE'])
+def delete_user(username):
+    user = User.query.filter_by(username = username).first()
+
+    if not user:
+       return make_response({"message":"No such user exists"},404)
+    
+    db.session.delete(user)
+    db.session.commit()
+
+    return make_response({"message":f"User {username} deleted"})
