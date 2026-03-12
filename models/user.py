@@ -8,3 +8,5 @@ class User(db.Model):
     password_hash = db.Column(db.String(256))
     created_at = db.Column(db.DateTime,server_default=db.func.now())
     role = db.Column(db.String(50),default="viewer")
+    verification_token = db.Column(db.String)
+    is_verified = db.Column(db.Boolean,default=False)

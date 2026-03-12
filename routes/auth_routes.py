@@ -8,10 +8,13 @@ from flask_jwt_extended import (
 )
 from models.user import User
 from extensions.db import db
+from utils import verification_token
 from utils.password import hash_password, verify_password
 from extensions.redis import redis_client
 import os
 from dotenv import load_dotenv
+from tasks.email_tasks import send_verification_email
+from utils.verification_token import generate_verificaction_token
 
 load_dotenv()
 
@@ -34,16 +37,37 @@ def register():
     user = User.query.filter_by(email=data["email"]).first()
     if user:
         return make_response({"message":"Email already exists"},409)
+    
+    token = generate_verificaction_token()
+
+    while User.query.filter_by(verification_token=token).first():
+        token = generate_verificaction_token()
+
     user = User(
         username=data["username"],
         email = data["email"],
-        password_hash = hashed
+        password_hash = hashed,
+        verification_token = token
     )
 
     db.session.add(user)
     db.session.commit()
 
+    send_verification_email.delay(user.email,token)
+
     return make_response({"message":"User registered successfully"},201)
+
+@auth_bp.route("/verify/<token>")
+def verify(token):
+    user = User.query.filter_by(verification_token=token).first()
+    if not user:
+        return make_response({"message":"No such user found with this token"},404)
+    
+    user.is_verified = True
+    user.verification_token = None
+    db.session.commit()
+
+    return make_response({"message":"User verified"})
 
 @auth_bp.route('login',methods=["POST"])
 def login():

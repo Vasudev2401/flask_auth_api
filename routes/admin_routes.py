@@ -1,6 +1,7 @@
 from flask import Blueprint,make_response,request
 from flask_jwt_extended import jwt_required,get_jwt_identity
 from constants import ALLOWED_ROLES
+from tasks.email_tasks import send_role_change_email
 from utils.role_required import role_required
 from models.user import User
 from extensions.db import db
@@ -24,37 +25,42 @@ def get_users():
 
     return make_response({"users":users,"total":pagination.total,"current_page":pagination.page},200)
 
+@admin_bp.route("/set_role/<username>", methods=["PATCH"])
 @jwt_required()
 @role_required(["admin"])
-@admin_bp.route("/set_role/<username>",methods=['PATCH'])
 def set_role(username):
+
     data = request.json
-    role = data["role"]
+    role = data.get("role")
     current_user_id = get_jwt_identity()
 
     if not role:
-        return make_response({"message":"Role not present"},400)
-    
+        return make_response({"message": "Role not present"}, 400)
+
     if role not in ALLOWED_ROLES:
-        return make_response({"message":"Wrong role Assigned"},400)
-    
+        return make_response({"message": "Wrong role assigned"}, 400)
+
     user = User.query.filter_by(username=username).first()
 
     if not user:
-        return make_response({"message":"User not found"},404)
-    
-    if user.role == current_user_id:
-        return make_response({"message":"You cant change your own role"},400)
-    
-    if role==user.role:
-        return make_response({"message":"No change in role"},400)
-    
-    if user.role=="admin":
-        return make_response({"message":"Cant change role of an admin"},400)
-    
+        return make_response({"message": "User not found"}, 404)
+
+    if user.id == current_user_id:
+        return make_response({"message": "You cant change your own role"}, 400)
+
+    if role == user.role:
+        return make_response({"message": "No change in role"}, 400)
+
+    if user.role == "admin":
+        return make_response({"message": "Cant change role of an admin"}, 400)
+
     user.role = role
+
+    send_role_change_email.delay(user.email, role)
+
     db.session.commit()
-    return make_response({"message":f"User {username} role changed to {role}"})
+
+    return make_response({"message": f"User {username} role changed to {role}"})
 
 @jwt_required()
 @role_required(["admin"])
